@@ -98,10 +98,9 @@ namespace MaxPayne.Server
 
                 DisconnectAfkPlayers();
 
-                var state = MakeGameState();
-
                 foreach (var (id, player) in _clients)
                 {
+                    var state = MakeGameState(excludeId: id);
                     _messenger.GameState(state, player.Endpoint);
                 }
                 //Debug.WriteLine("State built and sent");
@@ -130,13 +129,14 @@ namespace MaxPayne.Server
             }
         }
 
-        private GameState MakeGameState()
+        private GameState MakeGameState(int excludeId)
         {
             List<PlayerState> players = new();
             foreach (var (id, player) in _clients)
             {
+                if (id == excludeId) continue;
                 if (player.State is null) continue;
-                
+
                 var state = player.State.Value;
                 players.Add(new PlayerState
                 {
