@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\MaxPayne.Client.Backend\MaxPayne.Client.Backend.csproj" />
+      <ProjectReference Include="..\MaxPayne.Messages\MaxPayne.Messages.csproj" />
+    </ItemGroup>
+
+</Project>
