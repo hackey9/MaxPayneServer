@@ -24,7 +24,7 @@ namespace MaxPayne.Client.Backend
         private readonly object _gameSync = new();
         private readonly object _frameSync = new();
         private FrameState _frame;
-        private GameState _game;
+        private GameState _game = new GameState { Players = Array.Empty<PlayerState>() };
 
         private IpEndpoint? _serverEndpoint;
         private int? _serverId;
