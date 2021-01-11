@@ -259,6 +259,7 @@ namespace MaxPayne.Client.Backend
         {
             Console.WriteLine();
             Console.WriteLine("Try to connect...");
+            _serverWatch.Restart();
             var payload = new ClientWantsConnect();
             var message = new Message(payload.ToDatagram(), serverEndpoint);
             _network.Send(message);
