@@ -27,9 +27,19 @@ namespace MaxPayne.Server
 
         private int _lastId;
 
-        public App()
+        public App(int port)
+            : this(NetworkFactory.UdpServer(port))
         {
-            _network = NetworkFactory.UdpServer();
+        }
+
+        public App()
+            : this(NetworkFactory.UdpServer())
+        {
+        }
+
+        private App(INetwork<IpEndpoint> network)
+        {
+            _network = network;
             _messenger = new Messenger(_network);
             _broadcastThread = new Thread(ProcessBroadcast)
             {
@@ -66,6 +76,7 @@ namespace MaxPayne.Server
                             break;
                     }
                 }
+                Thread.Sleep(10);
             }
         }
 
@@ -106,10 +117,8 @@ namespace MaxPayne.Server
                 //Debug.WriteLine("State built and sent");
 
                 var sleep = SendDelay - (int) watch.ElapsedMilliseconds;
-                if (sleep > 0)
-                {
-                    Thread.Sleep(sleep);
-                }
+                
+                Thread.Sleep(sleep < 1 ? 1 : sleep);
             }
         }
 
@@ -165,10 +174,7 @@ namespace MaxPayne.Server
                 Console.WriteLine("Sent broadcast");
 
                 var sleep = BroadcastDelay - (int) watch.ElapsedMilliseconds;
-                if (sleep > 0)
-                {
-                    Thread.Sleep(sleep);
-                }
+                Thread.Sleep(sleep < 1 ? 1 : sleep);
             }
         }
 

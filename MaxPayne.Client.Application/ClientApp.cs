@@ -15,6 +15,7 @@ namespace MaxPayne.Client.Application
         }
 
         public static FrameState Frame = new FrameState();
+
         public static GameState OnFrame()
         {
             Debug.Assert(_backend is not null);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using MaxPayne.Client.Application;
@@ -46,7 +47,7 @@ namespace MaxPayneMod.ExampleAppCSharp
 
         private static void ProcessClient()
         {
-
+            var watch = Stopwatch.StartNew();
             var rand = new Random();
 
             ClientApp.OnAttach();
@@ -66,6 +67,13 @@ namespace MaxPayneMod.ExampleAppCSharp
                     Ammo3 = (short) rand.Next(0, 1000),
                 });
                 //var players = gameState.Players.Length;
+
+                if (watch.ElapsedMilliseconds > 12000)
+                {
+                    Console.WriteLine("Sleep 3s (Game pause test)");
+                    Thread.Sleep(3000);
+                    watch.Restart();
+                }
             }
 
             ClientApp.OnDetach();

@@ -12,4 +12,10 @@
       <ProjectReference Include="..\MaxPayne.Network\MaxPayne.Network.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="config-server.txt">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

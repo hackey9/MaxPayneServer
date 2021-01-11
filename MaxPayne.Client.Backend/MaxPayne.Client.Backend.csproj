@@ -8,4 +8,10 @@
       <ProjectReference Include="..\MaxPayne.Messages\MaxPayne.Messages.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="config-client.txt">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

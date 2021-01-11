@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using MaxPayne.Messages;
 using MaxPayne.Messages.FromServer;
@@ -12,10 +13,27 @@ namespace MaxPayne.Server
         {
             Console.WriteLine("Hello World!");
 
-            using var app = new App();
+            var port = LoadConfig("config-server.txt");
+
+            if (port is not null)
+            {
+                Console.WriteLine($"Use configured port {port}");
+            }
+
+            using var app = port is null
+                ? new App()
+                : new App(port.Value);
             app.Run();
 
             Console.ReadKey();
+        }
+
+        private static int? LoadConfig(string file)
+        {
+            if (!File.Exists(file)) return null;
+
+            var portString = File.ReadAllText(file);
+            return int.Parse(portString);
         }
 
         private static void RunClient()

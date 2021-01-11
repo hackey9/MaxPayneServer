@@ -20,7 +20,12 @@ namespace MaxPayne.Network.Drivers.Udp
         private bool _enabled;
 
         public UdpNetwork()
-            : this(new UdpClient(0, AddressFamily.InterNetwork))
+            : this(new UdpClient(new IPEndPoint(IPAddress.Any, 0)))
+        {
+        }
+
+        public UdpNetwork(IPEndPoint endpoint)
+            : this(new UdpClient(endpoint))
         {
         }
 
@@ -57,6 +62,8 @@ namespace MaxPayne.Network.Drivers.Udp
                 {
                     _udp.Send(message.Data.Buffer, message.Data.Length, message.Endpoint.Endpoint);
                 }
+
+                Thread.Sleep(5);
             }
         }
 
@@ -75,6 +82,8 @@ namespace MaxPayne.Network.Drivers.Udp
                 catch (SocketException)
                 {
                 }
+
+                Thread.Sleep(5);
             }
         }
 

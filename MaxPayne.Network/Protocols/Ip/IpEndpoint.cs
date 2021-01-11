@@ -21,7 +21,6 @@ namespace MaxPayne.Network.Protocols.Ip
         {
         }
 
-
         public IPAddress Ip => Endpoint.Address;
         public int Port => Endpoint.Port;
 

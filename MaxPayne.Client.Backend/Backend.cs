@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
+using System.Net;
 using System.Threading;
 using MaxPayne.Messages;
 using MaxPayne.Messages.FromClient;
@@ -15,6 +17,7 @@ namespace MaxPayne.Client.Backend
     {
         private const int SendStateDelay = 50;
         private const int DisconnectServerDelay = 1000;
+        private const int FrameLifetime = 200;
 
         private readonly INetwork<IpEndpoint> _network;
         private readonly Thread _receiverThread;
@@ -24,17 +27,40 @@ namespace MaxPayne.Client.Backend
         private readonly object _gameSync = new();
         private readonly object _frameSync = new();
         private FrameState _frame;
-        private GameState _game = new GameState { Players = Array.Empty<PlayerState>() };
+        private GameState _game = new GameState {Players = Array.Empty<PlayerState>()};
 
         private IpEndpoint? _serverEndpoint;
         private int? _serverId;
-        private Stopwatch _serverWatch = new();
+        private readonly Stopwatch _serverWatch = new();
+        private readonly bool _serverConfigured;
 
         public Backend()
         {
-            _network = NetworkFactory.UdpClient(NetworkFactory.UdpBroadcastEndpoint);
+            _serverEndpoint = LoadConfig("config-client.txt");
+            _serverConfigured = _serverEndpoint is not null;
+
+            _network = GetNetwork(useBroadcast: !_serverConfigured);
             _receiverThread = new Thread(ProcessReceive) {IsBackground = true};
             _senderThread = new Thread(ProcessSend) {IsBackground = true};
+
+            if (_serverEndpoint is not null)
+            {
+                Console.WriteLine($"Client configured to server {_serverEndpoint.Value.Endpoint}");
+            }
+        }
+
+        private static INetwork<IpEndpoint> GetNetwork(bool useBroadcast)
+            => useBroadcast
+                ? NetworkFactory.UdpClient(NetworkFactory.UdpBroadcastEndpoint)
+                : NetworkFactory.UdpClient();
+
+            private static IpEndpoint? LoadConfig(string file)
+        {
+            if (!File.Exists(file)) return null;
+
+            var configLine = File.ReadAllText(file);
+
+            return new IpEndpoint(IPEndPoint.Parse(configLine));
         }
 
         public void Start()
@@ -42,6 +68,11 @@ namespace MaxPayne.Client.Backend
             Console.WriteLine("Started");
             _receiverThread.Start();
             _senderThread.Start();
+
+            if (_serverConfigured)
+            {
+                SendIWantToConnect(_serverEndpoint!.Value);
+            }
         }
 
         public GameState Frame(FrameState state)
@@ -87,28 +118,41 @@ namespace MaxPayne.Client.Backend
 
                 if (_serverId is not null && _serverEndpoint is not null)
                 {
-                    var payload = new ClientSentFrame(_serverId.Value, _frame);
-                    var message = new Message(payload.ToDatagram(), _serverEndpoint.Value);
+                    if (_frameWatch.ElapsedMilliseconds < FrameLifetime)
+                    {
+                        var payload = new ClientSentFrame(_serverId.Value, _frame);
+                        var message = new Message(payload.ToDatagram(), _serverEndpoint.Value);
 
-                    _network.Send(message);
+                        _network.Send(message);
+                        Console.Write('-');
+                    }
                 }
 
                 var sleep = SendStateDelay - (int) requestWatch.ElapsedMilliseconds;
-                if (sleep > 0)
-                {
-                    Thread.Sleep(sleep);
-                }
+
+                Thread.Sleep(sleep < 1 ? 1 : sleep);
             }
         }
 
         private void DisconnectFromServer()
         {
-            // BUG race
-
+            Console.WriteLine();
             Console.WriteLine("Disconnected");
-            _serverId = null;
-            _serverEndpoint = null;
-            _serverWatch.Reset();
+            // BUG race
+            if (_serverConfigured)
+            {
+                _serverId = null;
+                _serverWatch.Restart();
+                SendIWantToConnect(_serverEndpoint!.Value);
+            }
+            else
+            {
+                _serverId = null;
+                _serverEndpoint = null;
+                _serverWatch.Reset();
+            }
+
+            
         }
 
         private void ProcessReceive()
@@ -118,7 +162,13 @@ namespace MaxPayne.Client.Backend
                 foreach (var networkMessage in _network.ReceiveAll())
                 {
                     if (!MessageFactory.TryFactory(networkMessage, out var message)) continue;
-                    
+
+                    if (_serverEndpoint is not null)
+                    {
+                        if (!_serverEndpoint.Equals(message.Endpoint))
+                            continue;
+                    }
+
                     switch (message)
                     {
                         case BroadcastServerIsHere broadcastMessage:
@@ -135,14 +185,14 @@ namespace MaxPayne.Client.Backend
                             break;
                     }
 
-                    Console.Write('+');
-
                     // update server timer
-                    if (_serverEndpoint is not null && _serverEndpoint.Value.Equals(message.Endpoint))
+                    if (_serverEndpoint is not null)
                     {
                         _serverWatch.Restart();
                     }
                 } // foreach message
+
+                Thread.Sleep(5);
             } // while true
         }
 
@@ -154,6 +204,7 @@ namespace MaxPayne.Client.Backend
                 return;
             }
 
+            Console.Write(state.Players.Length); 
             lock (_gameSync)
             {
                 _game = state;
@@ -162,40 +213,51 @@ namespace MaxPayne.Client.Backend
 
         private void HandleConnected(int clientId, IpEndpoint serverEndpoint)
         {
-            Console.WriteLine("Connect request...");
             if (_serverEndpoint is null) return;
 
             // if we have not connected as client
             if (_serverId is not null) return;
 
             // if servers are match
-            if (!_serverEndpoint.Value.Equals(serverEndpoint)) return;
+            if (!_serverEndpoint.Value.Equals(serverEndpoint))
+            {
+                return;
+            }
 
+            Console.WriteLine();
             Console.WriteLine($"Connected as {clientId}");
             _serverId = clientId;
         }
 
         private void HandleFuck(int clientId, IpEndpoint serverEndpoint)
         {
-            Console.WriteLine("Disconnect request...");
             if (_serverEndpoint is null || _serverId is null) return;
 
             if (_serverId.Value != clientId) return;
 
             if (serverEndpoint.Equals(_serverEndpoint.Value))
             {
-                Console.WriteLine("Disconnected");
+                Console.WriteLine();
+                Console.WriteLine("Disconnected by server");
                 DisconnectFromServer();
             }
         }
 
         private void HandleServerBroadcast(IpEndpoint serverEndpoint)
         {
-            Console.WriteLine($"Broadcast taken {serverEndpoint.Endpoint}");
+            if (_serverConfigured) return;
+
             if (_serverEndpoint is not null) return;
+            Console.WriteLine();
+            Console.WriteLine($"Broadcast taken {serverEndpoint.Endpoint}");
 
             _serverEndpoint = serverEndpoint;
+            SendIWantToConnect(serverEndpoint);
+        }
 
+        private void SendIWantToConnect(IpEndpoint serverEndpoint)
+        {
+            Console.WriteLine();
             Console.WriteLine("Try to connect...");
             var payload = new ClientWantsConnect();
             var message = new Message(payload.ToDatagram(), serverEndpoint);
